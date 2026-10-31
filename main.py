@@ -68,7 +68,23 @@ def task1_ingest():
     """
     rides = read_rides()
     # TODO
-    return None
+    rides = read_rides()
+    df = (rides
+          .withColumn("fare_per_km", sround(col("fare_amount") / col("distance_km"), 2))
+          .select("trip_id", "driver_id", "distance_km", "fare_amount", "fare_per_km", "event_time"))
+
+    # Write stream to CSV sink
+    query = (df.writeStream
+             .format("csv")
+             .option("header", "true")
+             .option("timestampFormat", "yyyy-MM-dd HH:mm:ss")
+             .option("checkpointLocation", ckpt_dir)
+             .option("path", out_dir)
+             .outputMode("append")
+             .trigger(availableNow=True)
+             .start())
+
+    return query
 
 
 # ---------------------------------------------------------------- Task 2: windows and watermark
@@ -83,8 +99,40 @@ def task2_fare_per_window(mode):
     option as in task 1.
     """
     rides = read_rides()
-    # TODO
-    return None
+    
+    aggregated_df = (rides
+                     .withWatermark("event_time", "2 minutes")
+                     .groupBy(window(col("event_time"), "2 minutes"))
+                     .agg(
+                         count("*").alias("trips"),
+                         sround(ssum("fare_amount"), 2).alias("total_fare")
+                     )
+                     .select(
+                         col("window.start").alias("window_start"),
+                         col("window.end").alias("window_end"),
+                         "trips",
+                         "total_fare"
+                     ))
+
+    # Configure output sink based on mode
+    if mode == "append":
+        writer = (aggregated_df.writeStream
+                  .format("csv")
+                  .option("header", "true")
+                  .option("timestampFormat", "yyyy-MM-dd HH:mm:ss")
+                  .option("checkpointLocation", ckpt_dir)
+                  .option("path", out_dir)
+                  .outputMode("append"))
+    else:  # mode == "update"
+        writer = (aggregated_df.writeStream
+                  .format("console")
+                  .option("truncate", "false")
+                  .option("timestampFormat", "yyyy-MM-dd HH:mm:ss")
+                  .option("checkpointLocation", ckpt_dir)
+                  .outputMode("update"))
+
+    query = writer.trigger(availableNow=True).start()
+    return query
 
 
 # ---------------------------------------------------------------- main

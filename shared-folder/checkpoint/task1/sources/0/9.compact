@@ -1,0 +1,11 @@
+v1
+{"path":"file:///opt/spark/work-dir/shared/stream/rides_00.jsonl","timestamp":1793458170946,"batchId":0}
+{"path":"file:///opt/spark/work-dir/shared/stream/rides_01.jsonl","timestamp":1793458170947,"batchId":1}
+{"path":"file:///opt/spark/work-dir/shared/stream/rides_02.jsonl","timestamp":1793458170947,"batchId":2}
+{"path":"file:///opt/spark/work-dir/shared/stream/rides_03.jsonl","timestamp":1793458170948,"batchId":3}
+{"path":"file:///opt/spark/work-dir/shared/stream/rides_04.jsonl","timestamp":1793458170949,"batchId":4}
+{"path":"file:///opt/spark/work-dir/shared/stream/rides_05.jsonl","timestamp":1793458170950,"batchId":5}
+{"path":"file:///opt/spark/work-dir/shared/stream/rides_06.jsonl","timestamp":1793458170951,"batchId":6}
+{"path":"file:///opt/spark/work-dir/shared/stream/rides_07.jsonl","timestamp":1793458170952,"batchId":7}
+{"path":"file:///opt/spark/work-dir/shared/stream/rides_08.jsonl","timestamp":1793458170953,"batchId":8}
+{"path":"file:///opt/spark/work-dir/shared/stream/rides_09.jsonl","timestamp":1793458170954,"batchId":9}
