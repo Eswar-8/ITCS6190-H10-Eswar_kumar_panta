@@ -118,8 +118,10 @@
   console). In which batch does each window first appear in update mode, and in which batch
   is it written in append mode? Explain the difference with the watermark values from the
   summary.
-  ``In update mode a window is printed in the batch where its first event arrives, and again in every later batch that changes it. The windows 07:58 and 08:00 first appear in batch 0, 08:02 in batch 2, 08:04 in batch 4, 08:06 in batch 6, 08:08 in batch 8 and 08:10 in batch 10. This matches the state-rows column, which grows by one every second batch. In update mode the value keeps changing until the window is final, for example 08:00–08:02 goes 20, 43, 47 trips in batches 0, 1 and 2, and 08:04–08:06 goes 21, 50, 55, 57 in batches 4 to 7. In append mode only the final row is written.
-  In append mode a window is written only once, in the first batch where the watermark has passed its end. The watermark is the largest event_time seen so far minus 2 minutes, and it reaches a window's end only about two minutes of event time after the window closes. From the summary: 07:58–08:00 is written in batch 3 (watermark 08:00:46), 08:00–08:02 in batch 5 (08:02:57), 08:02–08:04 in batch 7 (08:04:47), 08:04–08:06 in batch 9 (08:06:50) and 08:06–08:08 in batch 11 (08:08:51). Each window therefore appears in append mode 3 batches after it first appears in update mode, and it is written with its final value, while update mode shows intermediate values that keep changing. The windows 08:08–08:10 and 08:10–08:12 are never written, because the final watermark (08:09:54) never reaches 08:10.``
+  ```
+In update mode a window is printed in the batch where its first event arrives, and again in every later batch that changes it. The windows 07:58 and 08:00 first appear in batch 0, 08:02 in batch 2, 08:04 in batch 4, 08:06 in batch 6, 08:08 in batch 8 and 08:10 in batch 10. This matches the state-rows column: it rises to 3 in batches 2, 4, 6, 8 and 10, when a new window opens, and falls back to 2 in batches 3, 5, 7, 9 and 11, when a closed window is evicted. In update mode the value keeps changing until the window is final, for example 08:00–08:02 goes 20, 43, 47 trips in batches 0, 1 and 2, and 08:04–08:06 goes 21, 50, 55, 57 in batches 4 to 7. In append mode only the final row is written.
+In append mode a window is written only once, in the first batch where the watermark has passed its end. The watermark is the largest event_time seen so far minus 2 minutes, so it reaches a window's end only about two minutes of event time after the window closes. From the summary: 07:58–08:00 is written in batch 3 (watermark 08:00:46), 08:00–08:02 in batch 5 (08:02:57), 08:02–08:04 in batch 7 (08:04:47), 08:04–08:06 in batch 9 (08:06:50) and 08:06–08:08 in batch 11 (08:08:51). The 07:58 window is written 3 batches after it first appears in update mode, and every other window 5 batches after (08:00: batch 0 → 5, 08:02: 2 → 7, 08:04: 4 → 9, 08:06: 6 → 11). It is written with its final value, while update mode shows intermediate values that keep changing. The windows 08:08–08:10 and 08:10–08:12 are never written in append mode, because the final watermark (08:09:54) never reaches 08:10.
+```
   
   
   
@@ -129,8 +131,8 @@
   `datagen.py` for how the late events were made.)
   ```
   Two windows have fewer trips in the stream than in the batch table: 08:00–08:02 has 47 instead of 51 (4 fewer, fare 2152.43 instead of 2350.95) and 08:02–08:04 has 49 instead of 52 (3 fewer, fare 1848.29 instead of 2015.40). That is 7 trips, exactly the 7 events that datagen.py made "very late" (8 to 10 minutes before arrival, from file 9 on). They arrive in batches 9 to 11, when the watermark is already 08:06:50 to 08:08:51, so their windows (ending 08:02 and 08:04) are closed and their state is gone. Spark drops them silently. The windows 07:58–08:00 (4 trips), 08:04–08:06 (57) and 08:06–08:08 (51) are identical to the batch table. The 22 events that are only 1 to 2 minutes late are not lost: their windows are still open when they arrive, so they are counted.
-  
-  The windows 08:08–08:10 (40 trips in batch) and 08:10–08:12 (39 trips) are missing from the stream's output. They are still open at the end, because the final watermark 08:09:54 is before 08:10:00, so append mode has not written them (update mode printed them, 40 and 39 trips, in batch 11). Spark would write them once the watermark passes their ends, which needs events with an event_time of at least 08:12:00 and 08:14:00, for instance a 13th file one minute later.
+
+The windows 08:08–08:10 (40 trips in the batch table) and 08:10–08:12 (39 trips) are missing from the stream's output. They are still open at the end, because the final watermark 08:09:54 is before 08:10:00, so append mode has not written them (update mode did print them, 40 and 39 trips, in batch 11). Spark would write them once the watermark passes their ends, which needs events with an event_time of at least 08:12:00 and 08:14:00, for instance a 13th file one minute later.
   ```
   
   
@@ -141,13 +143,13 @@
   holds.
   ```
   Running task 1 again without deleting shared-folder/checkpoint/task1 ran one batch (batch 12) with 0 input rows and wrote nothing new. The output still holds the same 294 rows, with no duplicates. The checkpoint records which input files were already consumed and which batches were committed. On restart Spark compares the stream folder with that record, finds all 12 files already processed, and stops after an empty batch.
-  
-  Subfolders of shared-folder/checkpoint/task1:
-  
-  sources/: the state of the file source, i.e. which input files it has listed and read.
-  offsets/: one file per batch, written before the batch runs, saying which files that batch will process.
-  commits/: one marker per batch that finished and was written to the sink. Spark uses it to know which batches are complete.
-  metadata: a small file (not a folder) with the id of the query.
+
+Subfolders of shared-folder/checkpoint/task1:
+
+sources/: the state of the file source, i.e. which input files it has listed and read.
+offsets/: one file per batch, written before the batch runs, saying which files that batch will process.
+commits/: one marker per batch that finished and was written to the sink. Spark uses it to know which batches are complete.
+metadata: a small file (not a folder) with the id of the query.
   ```
   
   ---
